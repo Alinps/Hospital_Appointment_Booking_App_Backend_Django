@@ -238,8 +238,12 @@ def change_password(request):
 @csrf_exempt
 @permission_classes((IsAuthenticated,))
 def doctorlist(request):
-    doctors = Doctor.objects.all()
-    serializer = DoctorSerializer(doctors, many=True)
+    department=request.GET.get("department")
+    queryset = Doctor.objects.all()
+    
+    if department:
+        queryset=queryset.filter(department__iexact=department)
+    serializer = DoctorSerializer(queryset, many=True)
     return Response(serializer.data)
 
 
@@ -316,3 +320,8 @@ def Logout(request):
         return Response({'message': 'Logout successful'}, status=200)
     except Exception as e:
         return Response({'message': 'Error during logout'}, status=500)
+    
+    
+#api for filtering by department
+
+     
