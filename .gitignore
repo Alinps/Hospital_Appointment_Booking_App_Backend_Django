@@ -1,0 +1,13 @@
+#python bytecode
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+#Django stuff
+db.sqlite3
+
+#virtual environment
+venv/
+.env/

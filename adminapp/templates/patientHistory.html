@@ -1,0 +1,25 @@
+{%extends 'base.html'%}
+{%block content%}
+<div class = "container">
+
+    <table class="table table-bordered table-striped  text-center table-hover mt-3">
+        <h1>Appointment history of {{data.0.user.name}}</h1>
+        <tr>
+            <th>Patient</th>
+            <th>Doctor</th>
+            <th>Department</th>
+            <th>Date</th>
+            <th>Time</th>
+        </tr>
+         {% for item in data%}
+        <tr>
+           
+            <td>{{item.user.name}}</td>
+            <td>{{item.doctor.name}}</td>
+            <td>{{item.doctor.department}}</td>
+            <td>{{item.date|date:"F j, Y"}}</td>
+            <td>{{item.time|time:"P"}}</td>
+        </tr>
+        {%endfor%}
+    </table>
+{%endblock%}
