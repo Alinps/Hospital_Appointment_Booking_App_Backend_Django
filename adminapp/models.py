@@ -54,5 +54,8 @@ class Appoinment(models.Model):
     date = models.DateField()
     time = models.TimeField()
     
+    class Meta:
+        unique_together=["doctor","date","time"]
+    
     def str(self):
         return f"Appointment with Dr. {self.doctor.name} on {self.date}at{self.time}"

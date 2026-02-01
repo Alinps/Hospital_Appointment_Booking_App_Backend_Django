@@ -9,12 +9,14 @@ from rest_framework.status import HTTP_200_OK
 from .models import User,Doctor,Appoinment
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
-from .serializer import DoctorSerializer,AppointmentSerializer
+from .serializer import DoctorSerializer,AppointmentSerializer,AppointmentReschedulSerializer
 from datetime import datetime,date, timezone
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone 
 from rest_framework.pagination import PageNumberPagination
+from django.shortcuts import get_object_or_404
+
 
 
 
@@ -332,6 +334,37 @@ def Logout(request):
         return Response({'message': 'Error during logout'}, status=500)
     
     
-#api for filtering by department
 
-     
+#edit 
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def reschedule_appointment(request,pk):
+    appointment=get_object_or_404(Appoinment, pk=pk)
+
+    #permission check
+    if request.user!=appointment.user and not request.user.is_staff:
+        return Response(
+            {"error":"You do not have permission to reschedule this appointment,"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    serializer=AppointmentReschedulSerializer(
+        appointment,
+        data=request.data,
+        partial=True
+    )
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {
+                "message":"Appointment rescheduled successfully",
+                "appointment":serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+        
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    
