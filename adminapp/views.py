@@ -240,7 +240,11 @@ def change_password(request):
 @permission_classes((IsAuthenticated,))
 def doctorlist(request):
     department=request.GET.get("department")
+    search=request.GET.get("search")
     queryset = Doctor.objects.all().order_by("id")
+    
+    if search:
+        queryset=queryset.filter(name__icontains=search)
     
     if department:
         queryset=queryset.filter(department__iexact=department)
