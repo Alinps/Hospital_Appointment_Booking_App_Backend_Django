@@ -59,3 +59,16 @@ class Appoinment(models.Model):
     
     def str(self):
         return f"Appointment with Dr. {self.doctor.name} on {self.date}at{self.time}"
+    
+    
+    #profile model (extends user safely)
+class Profile(models.Model):
+    user=models.OneToOneField(User,on_delete=models.CASCADE)
+    phone=models.CharField(max_length=15,blank=True)
+    gender=models.CharField(max_length=10,blank=True)
+    dob=models.DateField(null=True,blank=True)
+    address=models.TextField(blank=True)
+    avatar=models.ImageField(upload_to="avatar/",null=True,blank=True)
+        
+    def __str__(self):
+            return self.user.username

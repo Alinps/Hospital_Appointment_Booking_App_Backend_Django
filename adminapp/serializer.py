@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from adminapp.models import Doctor
-from adminapp.models import Appoinment
+from adminapp.models import Appoinment,Profile
 from django.utils.timezone import now
 
 class DoctorSerializer(serializers.ModelSerializer):
@@ -43,3 +43,13 @@ class AppointmentReschedulSerializer(serializers.ModelSerializer):
                 "This time slot is already booked for the doctor."
             )
         return data
+    
+    
+    
+class ProfileSerializer(serializers.ModelSerializer):
+    email=serializers.EmailField(source="user.email",read_only=True)
+    username=serializers.CharField(source="user.username",read_only=True)
+    
+    class Meta:
+        model=Profile
+        fields="__all__"

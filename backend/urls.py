@@ -29,7 +29,8 @@ urlpatterns = [
     path('myappointments/',views.myappointments, name='myappointments'),
     path('cancelappointment/<int:id>/',views.cancelappointment, name='cancelappointment'),
      path('logout/',views.Logout, name='logout'),
-     path('appointments/<int:pk>/reschedule/',views.reschedule_appointment,name="appointment-reschedule")
+     path('appointments/<int:pk>/reschedule/',views.reschedule_appointment,name="appointment-reschedule"),
+     path('profile/',views.profile_view,name="profile")
     
     
 ]

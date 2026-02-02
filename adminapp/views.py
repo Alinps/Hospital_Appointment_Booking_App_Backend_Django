@@ -6,10 +6,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
-from .models import User,Doctor,Appoinment
+from .models import User,Doctor,Appoinment,Profile
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
-from .serializer import DoctorSerializer,AppointmentSerializer,AppointmentReschedulSerializer
+from .serializer import DoctorSerializer,AppointmentSerializer,AppointmentReschedulSerializer,ProfileSerializer
 from datetime import datetime,date, timezone
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
@@ -367,4 +367,18 @@ def reschedule_appointment(request,pk):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
+#profile
+@api_view(["GET","POST"])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    profile=Profile.objects.get(user=request.user)
+    if request.method=="GET":
+        serializer=ProfileSerializer(profile)
+        return Response(serializer.data)
     
+    if request.method=="PUT":
+        serializer=ProfileSerializer(profile,data=request.data,partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+        
