@@ -371,7 +371,7 @@ def reschedule_appointment(request,pk):
 @api_view(["GET","POST"])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
-    profile=Profile.objects.get(user=request.user)
+    profile, _ = Profile.objects.get_or_create(user=request.user)
     if request.method=="GET":
         serializer=ProfileSerializer(profile)
         return Response(serializer.data)
