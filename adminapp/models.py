@@ -21,12 +21,11 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser):  
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
-    
     dob = models.DateField(null=True, blank=True)  
     gender = models.CharField(max_length=10, choices=[('Male', 'Male'), ('Female', 'Female'), ('Other', 'Other')], null=True, blank=True)
     contact_no = models.CharField(max_length=15, null=True, blank=True)  
     address = models.TextField(null=True, blank=True)
-
+    avatar = models.ImageField(upload_to="avatar/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
 
@@ -85,14 +84,3 @@ class DoctorAvailability(models.Model):
 
     
     
-    #profile model (extends user safely)
-class Profile(models.Model):
-    user=models.OneToOneField(User,on_delete=models.CASCADE)
-    phone=models.CharField(max_length=15,blank=True)
-    gender=models.CharField(max_length=10,blank=True)
-    dob=models.DateField(null=True,blank=True)
-    address=models.TextField(blank=True)
-    avatar=models.ImageField(upload_to="avatar/",null=True,blank=True)
-        
-    def __str__(self):
-            return self.user.email
