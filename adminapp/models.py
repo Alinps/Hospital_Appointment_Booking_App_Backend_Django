@@ -63,7 +63,6 @@ class Appoinment(models.Model):
 
 class DoctorAvailability(models.Model):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-    
     DAY_CHOICES = [
         (0, "Monday"),
         (1, "Tuesday"),
@@ -73,7 +72,6 @@ class DoctorAvailability(models.Model):
         (5, "Saturday"),
         (6, "Sunday"),
     ]
-
     day_of_week = models.IntegerField(choices=DAY_CHOICES)
     start_time = models.TimeField()
     end_time = models.TimeField()
