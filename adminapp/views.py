@@ -16,6 +16,9 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone 
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
+import time
+import logging
+logger = logging.getLogger("appointment_app")
 
 
 
@@ -149,6 +152,8 @@ def doctor_availability_add(request, doctor_id):
     })
 
 
+
+
 def doctor_availability_list(request, doctor_id):
     doctor = get_object_or_404(Doctor, id=doctor_id)
 
@@ -162,6 +167,8 @@ def doctor_availability_list(request, doctor_id):
 
 
 
+
+
 def doctor_availability_delete(request, id):
     availability = get_object_or_404(DoctorAvailability, id=id)
     doctor_id = availability.doctor.id # type: ignore
@@ -171,6 +178,9 @@ def doctor_availability_delete(request, id):
         return redirect('doctor_availability_list', doctor_id=doctor_id)
 
     return redirect('doctor_availability_list', doctor_id=doctor_id)
+
+
+
 
         
 def history(request):
@@ -192,10 +202,16 @@ def report(request):
     )
     return render(request,'report.html',{"report_data":report_data})
 
+
+
+
+#-------------------------------API----------------------------------------
 #Signup
 @api_view(['POST'])
 @permission_classes((AllowAny,))
 def Signup(request):
+    logger.info("Signup request received")
+
     email = request.data.get("email")
     password = request.data.get("password")
     name = request.data.get("name")
@@ -204,55 +220,113 @@ def Signup(request):
     contact_no = request.data.get("contact_no")
     gender = request.data.get("gender")
 
+    
+    logger.info(f"Signup attempt for email={email}, name={name}")
+
     if not name or not email or not password:
-        return Response({'message': 'Name, email, and password are required'}, status=400)
+        logger.warning("Signup failed: Missing required fields")
+        return Response(
+            {'message': 'Name, email, and password are required'},
+            status=400
+        )
 
     if User.objects.filter(email=email).exists():
-        return JsonResponse({'message': 'Email already exists'}, status=400)
+        logger.warning(f"Signup failed: Email already exists ({email})")
+        return Response(
+            {'message': 'Email already exists'},
+            status=400
+        )
 
-    user = User.objects.create_user(email=email, password=password)  # type: ignore
-    user.name = name
-    user.dob = dob
-    user.address = address
-    user.contact_no = contact_no
-    user.gender = gender
-    user.save()
+    try:
+        user = User.objects.create_user(  # type: ignore
+            email=email,
+            password=password
+        )
 
-    return JsonResponse({'message': 'User created successfully'}, status=201)
+        user.name = name
+        user.dob = dob
+        user.address = address
+        user.contact_no = contact_no
+        user.gender = gender
+        user.save()
+
+        logger.info(f"User created successfully: id={user.id}, email={email}")
+
+        return Response(
+            {'message': 'User created successfully'},
+            status=201
+        )
+
+    except Exception as e:
+        logger.error(f"Signup error for email={email}: {str(e)}")
+
+        return Response(
+            {'error': 'Internal server error'},
+            status=500
+        )
 
 
 
-#Login
+
+
 @api_view(['POST'])
 @permission_classes((AllowAny,))
 def Login(request):
+    logger.info("Login request received")
+
     email = request.data.get('email')
     password = request.data.get('password')
 
+    
+    logger.info(f"Login attempt for email={email}")
+
     if not email or not password:
-        return Response({'message': 'Email and password are required'}, status=400)
+        logger.warning("Login failed: Missing email or password")
+        return Response(
+            {'message': 'Email and password are required'},
+            status=400
+        )
 
-    
-    user = authenticate(request, email=email, password=password)
+    try:
+        user = authenticate(request, email=email, password=password)
 
-    if user is None:
-        return Response({'message': 'Invalid email or password'}, status=401)
+        if user is None:
+            logger.warning(f"Login failed: Invalid credentials for email={email}")
+            return Response(
+                {'message': 'Invalid email or password'},
+                status=401
+            )
 
-    if not user.is_active:
-        return Response({'message': 'User account is disabled'}, status=403)
-    
-    token, created = Token.objects.get_or_create(user=user)
+        if not user.is_active:
+            logger.warning(f"Login failed: Inactive user email={email}")
+            return Response(
+                {'message': 'User account is disabled'},
+                status=403
+            )
 
-    
-    return JsonResponse({
-        'message': 'Login successful',
-        'user': {
-            'id': user.id, # type: ignore
-            'token': token.key,
-            'name' : user.name, # type: ignore
-            'email': user.email
-        }
-    }, status=200)
+        token, created = Token.objects.get_or_create(user=user)
+
+        logger.info(
+            f"Login successful: user_id={user.id}, email={email}, new_token={created}" # type: ignore
+        )
+
+        return Response({
+            'message': 'Login successful',
+            'user': {
+                'id': user.id, # type: ignore
+                'token': token.key,   
+                'name': user.name, # type: ignore
+                'email': user.email
+            }
+        }, status=200)
+
+    except Exception as e:
+        logger.error(f"Login error for email={email}: {str(e)}")
+
+        return Response(
+            {'error': 'Internal server error'},
+            status=500
+        )
     
     
     
@@ -262,29 +336,41 @@ def Login(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def change_password(request):
-    user = request.user  
+    user = request.user
+
+    logger.info(f"Password change request received for user_id={user.id}, email={user.email}")
 
     current_password = request.data.get('currentPassword')
     new_password = request.data.get('newPassword')
     confirm_password = request.data.get('confirmPassword')
 
-    
+    # Validate input
     if not current_password or not new_password or not confirm_password:
+        logger.warning(f"Password change failed (missing fields) user_id={user.id}")
         return Response({'message': 'All fields are required'}, status=400)
 
-    
+    # Check current password
     if not user.check_password(current_password):
+        logger.warning(f"Password change failed (wrong current password) user_id={user.id}")
         return Response({'message': 'Current password is incorrect'}, status=400)
 
-    
+    # Check new password match
     if new_password != confirm_password:
+        logger.warning(f"Password change failed (password mismatch) user_id={user.id}")
         return Response({'message': 'New passwords do not match'}, status=400)
 
-    
-    user.set_password(new_password)
-    user.save()
+    try:
+        user.set_password(new_password)
+        user.save()
 
-    return Response({'message': 'Password changed successfully'}, status=200)
+        logger.info(f"Password changed successfully for user_id={user.id}")
+
+        return Response({'message': 'Password changed successfully'}, status=200)
+
+    except Exception as e:
+        logger.error(f"Password change error for user_id={user.id}: {str(e)}")
+
+        return Response({'error': 'Internal server error'}, status=500)
 
 
 
@@ -294,136 +380,308 @@ def change_password(request):
 
 #doctorlist
 @api_view(['GET'])
-@csrf_exempt
 @permission_classes((IsAuthenticated,))
 def doctorlist(request):
-    department=request.GET.get("department")
-    search=request.GET.get("search")
-    queryset = Doctor.objects.all().order_by("id")
-    
-    if search:
-        queryset=queryset.filter(name__icontains=search)
-    
-    if department:
-        queryset=queryset.filter(department__iexact=department)
-    
-    # Pagination logic
-    paginator=PageNumberPagination()
-    paginator.page_size=10
-    paginated_queryset=paginator.paginate_queryset(queryset,request)
-    serializer = DoctorSerializer(paginated_queryset, many=True)
-    return paginator.get_paginated_response(serializer.data)
+    start_time = time.time()
+
+    department = request.GET.get("department")
+    search = request.GET.get("search")
+
+    logger.info(
+        f"Doctor list request received | user_id={request.user.id} "
+        f"| search={search} | department={department}"
+    )
+
+    try:
+        queryset = Doctor.objects.all().order_by("id")
+
+        # Search filter
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+
+        #  Department filter
+        if department:
+            queryset = queryset.filter(department__iexact=department)
+
+        total_count = queryset.count()
+
+        # Pagination
+        paginator = PageNumberPagination()
+        paginator.page_size = 10
+
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = DoctorSerializer(paginated_queryset, many=True)
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Doctor list success | user_id={request.user.id} "
+            f"| total={total_count} | returned={len(serializer.data)} "
+            f"| page={request.GET.get('page', 1)} "
+            f"| time={duration:.2f}s"
+        )
+
+        return paginator.get_paginated_response(serializer.data)
+
+    except Exception as e:
+        logger.error(
+            f"Doctor list error | user_id={request.user.id} | error={str(e)}"
+        )
+
+        return Response(
+            {"error": "Internal server error"},
+            status=500
+        )
+
+
+
+
+
 
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_available_slots(request, doctor_id):
+    start_time = time.time()
 
     date_str = request.GET.get('date')
 
-    doctor = Doctor.objects.get(id=doctor_id)
-    appointment_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    logger.info(
+        f"Slots request received | doctor_id={doctor_id} | date={date_str}"
+    )
 
-    # 🔹 Step 1: get schedule
-    availability = DoctorAvailability.objects.filter(
-        doctor=doctor,
-        day_of_week=appointment_date.weekday()
-    ).first()
+    if not date_str:
+        logger.warning(f"Slots failed: missing date | doctor_id={doctor_id}")
+        return Response({'error': 'Date is required'}, status=400)
 
-    if not availability:
-        return Response({'slots': []})
+    try:
+        doctor = Doctor.objects.get(id=doctor_id)
+        appointment_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-    # 🔹 Step 2: generate slots
-    slots = []
-    current = datetime.combine(appointment_date, availability.start_time)
-    end = datetime.combine(appointment_date, availability.end_time)
+        # get schedule
+        availability = DoctorAvailability.objects.filter(
+            doctor=doctor,
+            day_of_week=appointment_date.weekday()
+        ).first()
 
-    while current < end:
-        slots.append(current.time())
-        current += timedelta(minutes=30)
+        if not availability:
+            logger.info(
+                f"No availability | doctor_id={doctor_id} | date={date_str}"
+            )
+            return Response({'slots': []})
 
-    # 🔹 Step 3: get booked slots
-    booked = Appoinment.objects.filter(
-        doctor=doctor,
-        date=appointment_date
-    ).values_list('time', flat=True)
+        #  generate slots
+        slots = []
+        current = datetime.combine(appointment_date, availability.start_time)
+        end = datetime.combine(appointment_date, availability.end_time)
 
-    # 🔹 Step 4: remove booked
-    available = [
-        s.strftime("%H:%M")
-        for s in slots
-        if s not in booked
-    ]
+        while current < end:
+            slots.append(current.time())
+            current += timedelta(minutes=30)
 
-    return Response({'slots': available})
+        #get booked slots
+        booked = Appoinment.objects.filter(
+            doctor=doctor,
+            date=appointment_date
+        ).values_list('time', flat=True)
+
+        #  remove booked
+        available = [
+            s.strftime("%H:%M")
+            for s in slots
+            if s not in booked
+        ]
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Slots success | doctor_id={doctor_id} | date={date_str} "
+            f"| total_slots={len(slots)} | booked={len(booked)} "
+            f"| available={len(available)} | time={duration:.2f}s"
+        )
+
+        return Response({'slots': available})
+
+    except Doctor.DoesNotExist:
+        logger.warning(f"Slots failed: doctor not found | doctor_id={doctor_id}")
+        return Response({'error': 'Doctor not found'}, status=404)
+
+    except ValueError:
+        logger.warning(f"Slots failed: invalid date format | date={date_str}")
+        return Response({'error': 'Invalid date format'}, status=400)
+
+    except Exception as e:
+        logger.error(
+            f"Slots error | doctor_id={doctor_id} | date={date_str} | error={str(e)}"
+        )
+        return Response({'error': 'Internal server error'}, status=500)
 
 
 
 
-#appointment booking
+
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 def appointmentbooking(request):
+    start_time = time.time()
+
     doctor_id = request.data.get('doctor')
     date_str = request.data.get('date')
     time_str = request.data.get('time')
-    
+    user = request.user
+
+    logger.info(
+        f"Booking request received | user_id={user.id} "
+        f"| doctor_id={doctor_id} | date={date_str} | time={time_str}"
+    )
+
     if not doctor_id or not date_str or not time_str:
-        return Response({'error':'All feilds are required'},status=400)
+        logger.warning(f"Booking failed: missing fields | user_id={user.id}")
+        return Response({'error': 'All fields are required'}, status=400)
+
     try:
         doctor = Doctor.objects.get(id=doctor_id)
-        user = request.user
-        appointment_date = datetime.strptime(date_str, "%Y-%m-%d").date()  # .date() added here
+
+        appointment_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         appointment_time = datetime.strptime(time_str, "%H:%M").time()
-        
-        Appoinment.objects.create(
-            doctor = doctor,
-            user = user,
-            date = appointment_date,
-            time = appointment_time
+
+        #Check slot already booked
+        if Appoinment.objects.filter(
+            doctor=doctor,
+            date=appointment_date,
+            time=appointment_time
+        ).exists():
+            logger.warning(
+                f"Booking conflict | doctor_id={doctor_id} "
+                f"| date={date_str} | time={time_str}"
+            )
+            return Response({'error': 'Slot already booked'}, status=400)
+
+        # Create appointment
+        appointment = Appoinment.objects.create(
+            doctor=doctor,
+            user=user,
+            date=appointment_date,
+            time=appointment_time
         )
-        
-        return Response({'message':'Appointment booked'}, status=201)
-    except ValueError as e:
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Booking success | appointment_id={appointment.id} " # type: ignore
+            f"| user_id={user.id} | doctor_id={doctor_id} "
+            f"| time={time_str} | duration={duration:.2f}s"
+        )
+
+        return Response({
+            'message': 'Appointment booked',
+            'appointment_id': appointment.id # type: ignore
+        }, status=201)
+
+    except ValueError:
+        logger.warning(
+            f"Booking failed: invalid date/time | date={date_str} | time={time_str}"
+        )
         return Response({'error': 'Invalid date or time format'}, status=400)
+
     except Doctor.DoesNotExist:
-        return Response({'error':'Doctor not found'}, status=404)
-    except Response as e: # type: ignore
-        return Response({'error':str(e)}, status=500)
+        logger.warning(f"Booking failed: doctor not found | doctor_id={doctor_id}")
+        return Response({'error': 'Doctor not found'}, status=404)
+
+    except Exception as e:
+        logger.error(
+            f"Booking error | user_id={user.id} | doctor_id={doctor_id} | error={str(e)}"
+        )
+        return Response({'error': 'Internal server error'}, status=500)
     
+
+
+
+
+
+
 
 @api_view(['GET'])
 @permission_classes((IsAuthenticated,))
 def doctor_detail(request, doctor_id):
+    start_time = time.time()
+
+    logger.info(
+        f"Doctor detail request received | user_id={request.user.id} | doctor_id={doctor_id}"
+    )
+
     try:
         doctor = Doctor.objects.get(id=doctor_id)
 
         data = {
             "name": doctor.name,
             "department": doctor.department,
-
         }
 
-        return JsonResponse({"data": data})
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Doctor detail success | doctor_id={doctor_id} "
+            f"| user_id={request.user.id} | time={duration:.2f}s"
+        )
+
+        return Response({"data": data})
 
     except Doctor.DoesNotExist:
-        return JsonResponse({"error": "Doctor not found"}, status=404)
+        logger.warning(
+            f"Doctor detail failed: not found | doctor_id={doctor_id} "
+            f"| user_id={request.user.id}"
+        )
+        return Response({"error": "Doctor not found"}, status=404)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        logger.error(
+            f"Doctor detail error | doctor_id={doctor_id} "
+            f"| user_id={request.user.id} | error={str(e)}"
+        )
+        return Response({"error": "Internal server error"}, status=500)
 
-    
-    
+
+
     
  #list appoinmnt   
 @api_view(['GET'])
-@csrf_exempt
 @permission_classes((IsAuthenticated,))
 def myappointments(request):
-    appointment = Appoinment.objects.all()
-    serializer = AppointmentSerializer(appointment, many=True)
-    return Response(serializer.data)
+    start_time = time.time()
+
+    user = request.user
+
+    logger.info(f"My appointments request received | user_id={user.id}")
+
+    try:
+        appointments = Appoinment.objects.filter(user=user).order_by("-date", "-time")
+
+        serializer = AppointmentSerializer(appointments, many=True)
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"My appointments success | user_id={user.id} "
+            f"| count={len(serializer.data)} | time={duration:.2f}s"
+        )
+
+        return Response(serializer.data)
+
+    except Exception as e:
+        logger.error(
+            f"My appointments error | user_id={user.id} | error={str(e)}"
+        )
+
+        return Response(
+            {"error": "Internal server error"},
+            status=500
+        )
+
+
+
 
 
 
@@ -441,21 +699,52 @@ def cancelappointment(request,id):
     return Response({'message':'Appointment cancelled successfully'},status=200)
 
 
+
+
+
+
     
     
-    
-#logout
+
+
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def Logout(request):
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Logout request received | user_id={user.id} | email={user.email}")
+
     try:
-        # Delete the user's token to log them out
-        request.user.auth_token.delete()
+        token = Token.objects.filter(user=user).first()
+
+        if not token:
+            logger.warning(f"Logout: token not found | user_id={user.id}")
+            return Response({'message': 'Already logged out'}, status=400)
+
+        token.delete()
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Logout success | user_id={user.id} | duration={duration:.2f}s"
+        )
+
         return Response({'message': 'Logout successful'}, status=200)
+
     except Exception as e:
+        logger.error(
+            f"Logout error | user_id={user.id} | error={str(e)}"
+        )
+
         return Response({'message': 'Error during logout'}, status=500)
     
-    
+
+
+
+
 
 #edit 
 @api_view(["PUT"])
@@ -487,22 +776,80 @@ def reschedule_appointment(request,pk):
         )
         
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
     
-    
+
+
+
 @api_view(["GET", "PUT"])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
+    start_time = time.time()
+    user = request.user
 
     if request.method == "GET":
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
+        logger.info(f"Profile fetch request | user_id={user.id} | email={user.email}")
+
+        try:
+            serializer = UserSerializer(user)
+
+            duration = time.time() - start_time
+
+            logger.info(
+                f"Profile fetch success | user_id={user.id} | duration={duration:.2f}s"
+            )
+
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(
+                f"Profile fetch error | user_id={user.id} | error={str(e)}"
+            )
+            return Response({"error": "Internal server error"}, status=500)
 
     if request.method == "PUT":
-        serializer = UserSerializer(
-            request.user,
-            data=request.data,
-            partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        logger.info(f"Profile update request | user_id={user.id}")
+
+        
+        safe_fields = {
+            "name": request.data.get("full_name"),
+            "contact_no": request.data.get("contact_no"),
+            "gender": request.data.get("gender"),
+        }
+        logger.info(f"Profile update data | user_id={user.id} | fields={safe_fields}")
+
+        try:
+            serializer = UserSerializer(
+                user,
+                data=request.data,
+                partial=True
+            )
+
+            if not serializer.is_valid():
+                logger.warning(
+                    f"Profile update validation failed | user_id={user.id} "
+                    f"| errors={serializer.errors}"
+                )
+                return Response(serializer.errors, status=400)
+
+            serializer.save()
+
+            duration = time.time() - start_time
+
+            logger.info(
+                f"Profile update success | user_id={user.id} | duration={duration:.2f}s"
+            )
+
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(
+                f"Profile update error | user_id={user.id} | error={str(e)}"
+            )
+            return Response({"error": "Internal server error"}, status=500)
