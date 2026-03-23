@@ -84,7 +84,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'appointment_db',#Name of the database created for this project
         'USER': 'root',#Enter your mysql username
-        'PASSWORD': 'Alinps@7034588406',#Enter your mysql password
+        'PASSWORD': 'alinps@7034588406',#Enter your mysql password
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -141,6 +141,8 @@ REST_FRAMEWORK = {
          'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
         'rest_framework.permissions.IsAuthenticated', )
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

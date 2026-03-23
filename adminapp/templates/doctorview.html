@@ -17,6 +17,9 @@
                     <p class="mb-2"><strong>Department: {{data.department}}</strong></p>
                     <p class="mb-2"> <strong>Qualification:{{data.qualification}}</strong></p>
                     <p> <strong>Experience:{{data.experience}}</strong></p>
+                    <a href="{% url 'doctor_availability_list' data.id %}">
+                        Manage Availability
+                    </a>
                 
                 </div>
                 </div>

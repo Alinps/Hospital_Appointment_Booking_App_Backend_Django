@@ -6,11 +6,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
-from .models import User,Doctor,Appoinment,Profile
+from .models import User,Doctor,Appoinment,Profile,DoctorAvailability
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from .serializer import DoctorSerializer,AppointmentSerializer,AppointmentReschedulSerializer,ProfileSerializer
-from datetime import datetime,date, timezone
+from datetime import datetime,date, timedelta, timezone
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone 
@@ -26,7 +26,7 @@ def adminlogin(request):
         email = request.POST['email']
         password = request.POST['password']
         user = authenticate(request,email=email,password=password)
-        if user is not None and user.is_admin:
+        if user is not None and user.is_admin: # type: ignore
             login(request,user)
             return redirect('todaysappointment')
         else:
@@ -92,7 +92,7 @@ def doctorupdate(request,id):
         if 'image' in request.FILES:
             data.image = request.FILES['image']
         data.save()
-        return redirect('doctorview',id=data.id)
+        return redirect('doctorview',id=data.id) # type: ignore
     return render(request,'doctorupdate.html',{'data':data})
         
     
@@ -115,6 +115,62 @@ def doctoradd(request):
         return redirect('/doctormanagement')
     return render(request,'doctoradd.html')
 
+
+
+from .models import Doctor, DoctorAvailability
+from django.shortcuts import render, redirect, get_object_or_404
+
+
+def doctor_availability_add(request, doctor_id):
+    doctor = get_object_or_404(Doctor, id=doctor_id)
+
+    if request.method == "POST":
+        day_of_week = request.POST.get("day_of_week")
+        start_time = request.POST.get("start_time")
+        end_time = request.POST.get("end_time")
+
+        if not all([day_of_week, start_time, end_time]):
+            return render(request, "doctor_availability_add.html", {
+                "doctor": doctor,
+                "error": "All fields are required"
+            })
+
+        DoctorAvailability.objects.create(
+            doctor=doctor,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            end_time=end_time
+        )
+
+        return redirect('doctorview', id=doctor.id) # type: ignore
+
+    return render(request, "doctor_availability_add.html", {
+        "doctor": doctor
+    })
+
+
+def doctor_availability_list(request, doctor_id):
+    doctor = get_object_or_404(Doctor, id=doctor_id)
+
+    availability = DoctorAvailability.objects.filter(doctor=doctor)
+
+    return render(request, "doctor_availability_list.html", {
+        "doctor": doctor,
+        "availability": availability
+    })
+
+
+
+
+def doctor_availability_delete(request, id):
+    availability = get_object_or_404(DoctorAvailability, id=id)
+    doctor_id = availability.doctor.id # type: ignore
+
+    if request.method == "POST":
+        availability.delete()
+        return redirect('doctor_availability_list', doctor_id=doctor_id)
+
+    return redirect('doctor_availability_list', doctor_id=doctor_id)
 
         
 def history(request):
@@ -154,7 +210,7 @@ def Signup(request):
     if User.objects.filter(email=email).exists():
         return JsonResponse({'message': 'Email already exists'}, status=400)
 
-    user = User.objects.create_user(email=email, password=password)
+    user = User.objects.create_user(email=email, password=password)  # type: ignore
     user.name = name
     user.dob = dob
     user.address = address
@@ -191,9 +247,9 @@ def Login(request):
     return JsonResponse({
         'message': 'Login successful',
         'user': {
-            'id': user.id,
+            'id': user.id, # type: ignore
             'token': token.key,
-            'name' : user.name,
+            'name' : user.name, # type: ignore
             'email': user.email
         }
     }, status=200)
@@ -260,6 +316,49 @@ def doctorlist(request):
 
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_available_slots(request, doctor_id):
+
+    date_str = request.GET.get('date')
+
+    doctor = Doctor.objects.get(id=doctor_id)
+    appointment_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    # 🔹 Step 1: get schedule
+    availability = DoctorAvailability.objects.filter(
+        doctor=doctor,
+        day_of_week=appointment_date.weekday()
+    ).first()
+
+    if not availability:
+        return Response({'slots': []})
+
+    # 🔹 Step 2: generate slots
+    slots = []
+    current = datetime.combine(appointment_date, availability.start_time)
+    end = datetime.combine(appointment_date, availability.end_time)
+
+    while current < end:
+        slots.append(current.time())
+        current += timedelta(minutes=30)
+
+    # 🔹 Step 3: get booked slots
+    booked = Appoinment.objects.filter(
+        doctor=doctor,
+        date=appointment_date
+    ).values_list('time', flat=True)
+
+    # 🔹 Step 4: remove booked
+    available = [
+        s.strftime("%H:%M")
+        for s in slots
+        if s not in booked
+    ]
+
+    return Response({'slots': available})
+
+
 
 
 #appointment booking
@@ -270,7 +369,7 @@ def appointmentbooking(request):
     date_str = request.data.get('date')
     time_str = request.data.get('time')
     
-    if not doctor_id or not date or not time_str:
+    if not doctor_id or not date_str or not time_str:
         return Response({'error':'All feilds are required'},status=400)
     try:
         doctor = Doctor.objects.get(id=doctor_id)
@@ -290,8 +389,31 @@ def appointmentbooking(request):
         return Response({'error': 'Invalid date or time format'}, status=400)
     except Doctor.DoesNotExist:
         return Response({'error':'Doctor not found'}, status=404)
-    except Response as e:
+    except Response as e: # type: ignore
         return Response({'error':str(e)}, status=500)
+    
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def doctor_detail(request, doctor_id):
+    try:
+        doctor = Doctor.objects.get(id=doctor_id)
+
+        data = {
+            "name": doctor.name,
+            "department": doctor.department,
+
+        }
+
+        return JsonResponse({"data": data})
+
+    except Doctor.DoesNotExist:
+        return JsonResponse({"error": "Doctor not found"}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+    
     
     
  #list appoinmnt   

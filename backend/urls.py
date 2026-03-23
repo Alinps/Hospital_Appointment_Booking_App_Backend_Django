@@ -13,8 +13,11 @@ urlpatterns = [
     path('doctoradd/',views.doctoradd,name='doctoradd'),
     path('history/',views.history,name='history'),
     path('report/',views.report,name='report'),
-    path('doctor/delete/<int:id>',views.doctordelete,name="delete_doctor"),
+    path('doctor/delete/<int:id>',views.doctordelete,name="delete_doctor"), # type: ignore
     path('patients/history/<int:id>',views.patientHistory,name="patient_history"),
+    path('doctor/<int:doctor_id>/availability/add/', views.doctor_availability_add, name='doctor_availability_add'),
+path('doctor/<int:doctor_id>/availability/', views.doctor_availability_list, name='doctor_availability_list'),
+path('availability/delete/<int:id>/', views.doctor_availability_delete, name='doctor_availability_delete'),
 
     
     
@@ -30,7 +33,9 @@ urlpatterns = [
     path('cancelappointment/<int:id>/',views.cancelappointment, name='cancelappointment'),
      path('logout/',views.Logout, name='logout'),
      path('appointments/<int:pk>/reschedule/',views.reschedule_appointment,name="appointment-reschedule"),
-     path('profile/',views.profile_view,name="profile")
+     path('profile/',views.profile_view,name="profile"),
+     path('doctor/<int:doctor_id>/slots/',views.get_available_slots,name="available_slots"),
+     path('doctordetail/<int:doctor_id>',views.doctor_detail)
     
     
 ]

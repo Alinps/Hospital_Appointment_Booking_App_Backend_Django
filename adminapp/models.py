@@ -60,6 +60,30 @@ class Appoinment(models.Model):
     def str(self):
         return f"Appointment with Dr. {self.doctor.name} on {self.date}at{self.time}"
     
+
+
+class DoctorAvailability(models.Model):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    
+    DAY_CHOICES = [
+        (0, "Monday"),
+        (1, "Tuesday"),
+        (2, "Wednesday"),
+        (3, "Thursday"),
+        (4, "Friday"),
+        (5, "Saturday"),
+        (6, "Sunday"),
+    ]
+
+    day_of_week = models.IntegerField(choices=DAY_CHOICES)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    def __str__(self):
+        return f"{self.doctor.name} - {self.get_day_of_week_display()}" # type: ignore
+
+
+    
     
     #profile model (extends user safely)
 class Profile(models.Model):

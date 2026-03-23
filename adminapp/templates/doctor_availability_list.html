@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{%block title%}Doctor Availability list{%endblock%}
+{%block content%}
+<h2>{{ doctor.name }} Availability</h2>
+
+<a href="{% url 'doctor_availability_add' doctor.id %}">Add Availability</a>
+
+<table border="1">
+  <tr>
+    <th>Day</th>
+    <th>Start</th>
+    <th>End</th>
+    <th>Action</th>
+  </tr>
+
+  {% for a in availability %}
+  <tr>
+    <td>{{ a.get_day_of_week_display }}</td>
+    <td>{{ a.start_time }}</td>
+    <td>{{ a.end_time }}</td>
+    <td>
+      <form method="POST" action="{% url 'doctor_availability_delete' a.id %}">
+        {% csrf_token %}
+        <button type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{%endblock%}
