@@ -48,6 +48,7 @@ class AppointmentReschedulSerializer(serializers.ModelSerializer):
     
 class ProfileSerializer(serializers.ModelSerializer):
     email=serializers.EmailField(source="user.email",read_only=True)
+    full_name=serializers.CharField(source="user.name")
  
     
     class Meta:

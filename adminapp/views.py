@@ -368,7 +368,7 @@ def reschedule_appointment(request,pk):
     
     
 #profile
-@api_view(["GET","POST"])
+@api_view(["GET","PUT"])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
     profile, _ = Profile.objects.get_or_create(user=request.user)
