@@ -16,6 +16,8 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone 
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
+from .models import Doctor, DoctorAvailability
+from django.shortcuts import render, redirect
 import time
 import logging
 logger = logging.getLogger("appointment_app")
@@ -23,134 +25,502 @@ logger = logging.getLogger("appointment_app")
 
 
 
+
+
 def adminlogin(request):
+    start_time = time.time()
     error = ""
+
+    # GET request
+    if request.method == "GET":
+        logger.info("Admin login page accessed")
+        return render(request, 'adminlogin.html')
+
+    #  POST request
     if request.method == "POST":
-        email = request.POST['email']
-        password = request.POST['password']
-        user = authenticate(request,email=email,password=password)
-        if user is not None and user.is_admin: # type: ignore
-            login(request,user)
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+
+        ip = request.META.get("REMOTE_ADDR")
+
+        logger.info(f"Admin login attempt | email={email} | ip={ip}")
+
+        try:
+            if not email or not password:
+                logger.warning(f"Admin login failed: missing fields | email={email}")
+                return render(
+                    request,
+                    'adminlogin.html',
+                    {"error": "Email and password required"}
+                )
+
+            user = authenticate(request, email=email, password=password)
+
+            if user is None:
+                logger.warning(f"Admin login failed: invalid credentials | email={email}")
+                return render(
+                    request,
+                    'adminlogin.html',
+                    {"error": "Invalid credentials"}
+                )
+
+            if not user.is_admin: # type: ignore
+                logger.warning(f"Admin login failed: not admin | user_id={user.id}") # type: ignore
+                return render(
+                    request,
+                    'adminlogin.html',
+                    {"error": "Not an admin account"}
+                )
+
+            #  Success
+            login(request, user)
+
+            duration = time.time() - start_time
+
+            logger.info(
+                f"Admin login success | user_id={user.id} " # type: ignore
+                f"| email={email} | duration={duration:.2f}s"
+            )
+
             return redirect('todaysappointment')
-        else:
-            return render(request,'adminlogin.html',{"error":"Invalid credential or not an admin"})
-    return render(request,'adminlogin.html')
+
+        except Exception as e:
+            logger.error(
+                f"Admin login error | email={email} | error={str(e)}"
+            )
+
+            return render(
+                request,
+                'adminlogin.html',
+                {"error": "Internal server error"}
+            )
         
             
     
+
+
+
 def todaysappointment(request):
+    start_time = time.time()
+    user = request.user
+
     selected_date = request.GET.get('date')
     now = timezone.now()
-    if selected_date:
-        appointments =Appoinment.objects.filter(date=selected_date)
-    else:
-        today = date.today()
-        appointments = Appoinment.objects.filter(date=today)
-    past_appointments = Appoinment.objects.filter(date__lt=now.date()).order_by('-date')
-    upcoming_appointments = Appoinment.objects.filter(date__gte=now.date()).order_by('date')
-    
-    context = {
-        'appointment':appointments,
-        'selected_date':selected_date or date.today().isoformat(),
-        'past_appointments':past_appointments,
-        'upcoming_appointments':upcoming_appointments,
-    }
-    return render(request, 'todaysappointment.html',context)
+
+    logger.info(
+        f"Today's appointment view accessed | user_id={user.id} "
+        f"| selected_date={selected_date}"
+    )
+
+    try:
+        # Filter appointments
+        if selected_date:
+            appointments = Appoinment.objects.filter(date=selected_date)
+        else:
+            today = date.today()
+            appointments = Appoinment.objects.filter(date=today)
+
+        #  Past & upcoming
+        past_appointments = Appoinment.objects.filter(
+            date__lt=now.date()
+        ).order_by('-date')
+
+        upcoming_appointments = Appoinment.objects.filter(
+            date__gte=now.date()
+        ).order_by('date')
+
+        #  Counts for logging
+        total_today = appointments.count()
+        total_past = past_appointments.count()
+        total_upcoming = upcoming_appointments.count()
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Today's appointment success | user_id={user.id} "
+            f"| today_count={total_today} | past_count={total_past} "
+            f"| upcoming_count={total_upcoming} "
+            f"| duration={duration:.2f}s"
+        )
+
+        context = {
+            'appointment': appointments,
+            'selected_date': selected_date or date.today().isoformat(),
+            'past_appointments': past_appointments,
+            'upcoming_appointments': upcoming_appointments,
+        }
+
+        return render(request, 'todaysappointment.html', context)
+
+    except Exception as e:
+        logger.error(
+            f"Today's appointment error | user_id={user.id} | error={str(e)}"
+        )
+
+        return render(
+            request,
+            'todaysappointment.html',
+            {"error": "Internal server error"}
+        )
+
 
 
 
 
 
 def doctormanagement(request):
-    data = Doctor.objects.all()
-    return render(request,'doctormanagement.html',{'data':data})
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Doctor management view accessed | user_id={user.id}")
+
+    try:
+        
+        if not user.is_authenticated or not user.is_admin:
+            logger.warning(f"Unauthorized access to doctor management | user_id={user.id}")
+            return redirect('adminlogin')
+
+        data = Doctor.objects.all()
+        count = data.count()
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Doctor management success | user_id={user.id} "
+            f"| total_doctors={count} | duration={duration:.2f}s"
+        )
+
+        return render(request, 'doctormanagement.html', {'data': data})
+
+    except Exception as e:
+        logger.error(
+            f"Doctor management error | user_id={user.id} | error={str(e)}"
+        )
+
+        return render(
+            request,
+            'doctormanagement.html',
+            {'error': 'Internal server error'}
+        )
 
 
 
 
-def doctordelete(request,id):
-    if request.method == 'POST':
-        doctor = get_object_or_404(Doctor,id=id)
+
+
+
+def doctordelete(request, id):
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Doctor delete request | user_id={user.id} | doctor_id={id}")
+
+    
+    if request.method != 'POST':
+        logger.warning(
+            f"Doctor delete failed: invalid method | user_id={user.id} | method={request.method}"
+        )
+        return redirect('doctormanagement')
+
+    
+    if not user.is_authenticated or not user.is_admin:
+        logger.warning(
+            f"Unauthorized doctor delete attempt | user_id={user.id} | doctor_id={id}"
+        )
+        return redirect('adminlogin')
+
+    try:
+        doctor = get_object_or_404(Doctor, id=id)
+
+        doctor_name = doctor.name
+
         doctor.delete()
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Doctor deleted | doctor_id={id} | doctor_name={doctor_name} "
+            f"| deleted_by={user.id} | duration={duration:.2f}s"
+        )
+
+        return redirect('doctormanagement')
+
+    except Exception as e:
+        logger.error(
+            f"Doctor delete error | user_id={user.id} | doctor_id={id} | error={str(e)}"
+        )
         return redirect('doctormanagement')
 
 
 
 
 
-def doctorview(request,id):
-    doctor = get_object_or_404(Doctor, id=id)
-    return render(request,'doctorview.html',{'data':doctor})
+
+
+
+def doctorview(request, id):
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Doctor view request | user_id={user.id} | doctor_id={id}")
 
     
-
-
-def doctorupdate(request,id):
-    data = get_object_or_404(Doctor,id=id)
-    if request.method =="POST":
-        data.name = request.POST.get('name')
-        data.department = request.POST.get('department')
-        data.qualification = request.POST.get('qualification')
-        data.experience = request.POST.get('experience')
-        if 'image' in request.FILES:
-            data.image = request.FILES['image']
-        data.save()
-        return redirect('doctorview',id=data.id) # type: ignore
-    return render(request,'doctorupdate.html',{'data':data})
-        
-    
-def doctoradd(request):
-    if request.method =='POST':
-        name = request.POST.get('name')
-        department = request.POST.get('department')
-        qualification = request.POST.get('qualification')
-        experience = request.POST.get('experience')
-        image = request.FILES.get('image')  #
-        print(image)
-        
-        Doctor.objects.create(
-            name=name,
-            department=department,
-            qualification=qualification,
-            experience=experience,
-            image=image
+    if not user.is_authenticated or not user.is_admin:
+        logger.warning(
+            f"Unauthorized doctor view access | user_id={user.id} | doctor_id={id}"
         )
-        return redirect('/doctormanagement')
-    return render(request,'doctoradd.html')
+        return redirect('adminlogin')
+
+    try:
+        doctor = get_object_or_404(Doctor, id=id)
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Doctor view success | doctor_id={id} | doctor_name={doctor.name} "
+            f"| user_id={user.id} | duration={duration:.2f}s"
+        )
+
+        return render(request, 'doctorview.html', {'data': doctor})
+
+    except Exception as e:
+        logger.error(
+            f"Doctor view error | user_id={user.id} | doctor_id={id} | error={str(e)}"
+        )
+
+        return render(
+            request,
+            'doctorview.html',
+            {'error': 'Internal server error'}
+        )
+
+    
 
 
 
-from .models import Doctor, DoctorAvailability
-from django.shortcuts import render, redirect, get_object_or_404
+
+
+def doctorupdate(request, id):
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Doctor update view accessed | user_id={user.id} | doctor_id={id}")
+
+    
+    if not user.is_authenticated or not user.is_admin:
+        logger.warning(
+            f"Unauthorized doctor update access | user_id={user.id} | doctor_id={id}"
+        )
+        return redirect('adminlogin')
+
+    try:
+        data = get_object_or_404(Doctor, id=id)
+
+        if request.method == "POST":
+            
+            old_data = {
+                "name": data.name,
+                "department": data.department,
+                "qualification": data.qualification,
+                "experience": data.experience,
+            }
+
+            # New values
+            new_name = request.POST.get('name')
+            new_department = request.POST.get('department')
+            new_qualification = request.POST.get('qualification')
+            new_experience = request.POST.get('experience')
+
+            # Apply updates
+            data.name = new_name
+            data.department = new_department
+            data.qualification = new_qualification
+            data.experience = new_experience
+
+            image_updated = False
+            if 'image' in request.FILES:
+                data.image = request.FILES['image']
+                image_updated = True
+
+            data.save()
+
+            duration = time.time() - start_time
+
+            logger.info(
+                f"Doctor updated | doctor_id={id} | updated_by={user.id} "
+                f"| old={old_data} "
+                f"| new={{'name': new_name, 'department': new_department}} "
+                f"| image_updated={image_updated} "
+                f"| duration={duration:.2f}s"
+            )
+
+            return redirect('doctorview', id=data.id) # type: ignore
+
+        return render(request, 'doctorupdate.html', {'data': data})
+
+    except Exception as e:
+        logger.error(
+            f"Doctor update error | user_id={user.id} | doctor_id={id} | error={str(e)}"
+        )
+
+        return render(
+            request,
+            'doctorupdate.html',
+            {'error': 'Internal server error'}
+        )
+        
+
+
+
+def doctoradd(request):
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Doctor add view accessed | user_id={user.id}")
+
+    
+    if not user.is_authenticated or not user.is_admin:
+        logger.warning(f"Unauthorized doctor add attempt | user_id={user.id}")
+        return redirect('adminlogin')
+
+    try:
+        if request.method == 'POST':
+            name = request.POST.get('name')
+            department = request.POST.get('department')
+            qualification = request.POST.get('qualification')
+            experience = request.POST.get('experience')
+            image = request.FILES.get('image')
+
+            
+            if not name or not department:
+                logger.warning(
+                    f"Doctor add failed: missing required fields | user_id={user.id}"
+                )
+                return render(
+                    request,
+                    'doctoradd.html',
+                    {'error': 'Name and department are required'}
+                )
+
+            doctor = Doctor.objects.create(
+                name=name,
+                department=department,
+                qualification=qualification,
+                experience=experience,
+                image=image
+            )
+
+            duration = time.time() - start_time
+
+            logger.info(
+                f"Doctor created | doctor_id={doctor.id} | name={name} " # type: ignore
+                f"| department={department} | created_by={user.id} "
+                f"| image_uploaded={bool(image)} "
+                f"| duration={duration:.2f}s"
+            )
+
+            return redirect('/doctormanagement')
+
+        return render(request, 'doctoradd.html')
+
+    except Exception as e:
+        logger.error(
+            f"Doctor add error | user_id={user.id} | error={str(e)}"
+        )
+
+        return render(
+            request,
+            'doctoradd.html',
+            {'error': 'Internal server error'}
+        )
+
+
+
+
+
 
 
 def doctor_availability_add(request, doctor_id):
-    doctor = get_object_or_404(Doctor, id=doctor_id)
+    start_time = time.time()
+    user = request.user
 
-    if request.method == "POST":
-        day_of_week = request.POST.get("day_of_week")
-        start_time = request.POST.get("start_time")
-        end_time = request.POST.get("end_time")
+    logger.info(
+        f"Availability add view accessed | user_id={user.id} | doctor_id={doctor_id}"
+    )
 
-        if not all([day_of_week, start_time, end_time]):
-            return render(request, "doctor_availability_add.html", {
-                "doctor": doctor,
-                "error": "All fields are required"
-            })
+    
+    if not user.is_authenticated or not user.is_admin:
+        logger.warning(
+            f"Unauthorized availability add attempt | user_id={user.id} | doctor_id={doctor_id}"
+        )
+        return redirect('adminlogin')
 
-        DoctorAvailability.objects.create(
-            doctor=doctor,
-            day_of_week=day_of_week,
-            start_time=start_time,
-            end_time=end_time
+    try:
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+
+        if request.method == "POST":
+            day_of_week = request.POST.get("day_of_week")
+            start_time_val = request.POST.get("start_time")
+            end_time_val = request.POST.get("end_time")
+
+            logger.info(
+                f"Availability add attempt | doctor_id={doctor_id} "
+                f"| day={day_of_week} | start={start_time_val} | end={end_time_val}"
+            )
+
+            #  Validation
+            if not all([day_of_week, start_time_val, end_time_val]):
+                logger.warning(
+                    f"Availability add failed: missing fields | doctor_id={doctor_id}"
+                )
+                return render(request, "doctor_availability_add.html", {
+                    "doctor": doctor,
+                    "error": "All fields are required"
+                })
+
+            
+            if start_time_val >= end_time_val:
+                logger.warning(
+                    f"Availability add failed: invalid time range | doctor_id={doctor_id}"
+                )
+                return render(request, "doctor_availability_add.html", {
+                    "doctor": doctor,
+                    "error": "Start time must be before end time"
+                })
+
+            availability = DoctorAvailability.objects.create(
+                doctor=doctor,
+                day_of_week=day_of_week,
+                start_time=start_time_val,
+                end_time=end_time_val
+            )
+
+            duration = time.time() - start_time
+
+            logger.info(
+                f"Availability created | availability_id={availability.id} " # type: ignore
+                f"| doctor_id={doctor_id} | day={day_of_week} "
+                f"| start={start_time_val} | end={end_time_val} "
+                f"| created_by={user.id} | duration={duration:.2f}s"
+            )
+
+            return redirect('doctorview', id=doctor.id) # type: ignore
+
+        return render(request, "doctor_availability_add.html", {
+            "doctor": doctor
+        })
+
+    except Exception as e:
+        logger.error(
+            f"Availability add error | user_id={user.id} "
+            f"| doctor_id={doctor_id} | error={str(e)}"
         )
 
-        return redirect('doctorview', id=doctor.id) # type: ignore
-
-    return render(request, "doctor_availability_add.html", {
-        "doctor": doctor
-    })
-
+        return render(
+            request,
+            "doctor_availability_add.html",
+            {"error": "Internal server error"}
+        )
 
 
 
@@ -169,38 +539,168 @@ def doctor_availability_list(request, doctor_id):
 
 
 
-def doctor_availability_delete(request, id):
-    availability = get_object_or_404(DoctorAvailability, id=id)
-    doctor_id = availability.doctor.id # type: ignore
 
-    if request.method == "POST":
+
+
+def doctor_availability_delete(request, id):
+    start_time = time.time()
+    user = request.user
+
+    logger.info(f"Availability delete request | user_id={user.id} | availability_id={id}")
+
+    
+    if request.method != "POST":
+        logger.warning(
+            f"Availability delete failed: invalid method | user_id={user.id} | method={request.method}"
+        )
+        return redirect('doctor_availability_list')
+
+    
+    if not user.is_authenticated or not user.is_admin:
+        logger.warning(
+            f"Unauthorized availability delete attempt | user_id={user.id} | availability_id={id}"
+        )
+        return redirect('adminlogin')
+
+    try:
+        availability = get_object_or_404(DoctorAvailability, id=id)
+
+        doctor_id = availability.doctor.id # type: ignore
+        doctor_name = availability.doctor.name
+        day = availability.day_of_week
+        start_time_val = availability.start_time
+        end_time_val = availability.end_time
+
         availability.delete()
+
+        duration = time.time() - start_time
+
+        logger.info(
+            f"Availability deleted | availability_id={id} | doctor_id={doctor_id} "
+            f"| doctor_name={doctor_name} | day={day} "
+            f"| start={start_time_val} | end={end_time_val} "
+            f"| deleted_by={user.id} | duration={duration:.2f}s"
+        )
+
         return redirect('doctor_availability_list', doctor_id=doctor_id)
 
-    return redirect('doctor_availability_list', doctor_id=doctor_id)
+    except Exception as e:
+        logger.error(
+            f"Availability delete error | user_id={user.id} | availability_id={id} | error={str(e)}"
+        )
+
+        return redirect('doctor_availability_list', doctor_id=doctor_id)
 
 
 
 
         
+
+
 def history(request):
+    logger.info(f"REQUEST → {request.method} {request.path}")
+
     data = Appoinment.objects.all()
-    return render(request,'history.html',{"data":data})
+    count = data.count()
+
+    logger.info(f"Fetched {count} appointments from database")
+
+    response = render(request, 'history.html', {"data": data})
+
+    logger.info(f"RESPONSE ← {request.method} {request.path} | Status: 200")
+
+    return response
+
+
 
 
 
 def patientHistory(request, id):
-    history = Appoinment.objects.filter(user__id=id).order_by('-date')
-    return render(request, 'patientHistory.html', {"data": history})
+    logger.info(f"REQUEST → {request.method} {request.path} | user_id={id}")
+
+    start_time = time.time()
+
+    try:
+        queryset = (
+            Appoinment.objects
+            .filter(user__id=id)
+            .order_by('-date')
+        )
+
+        # Force evaluation
+        history_list = list(queryset)
+
+        query_time = time.time() - start_time
+
+        logger.info(f"Patient history query executed in {query_time:.4f}s")
+        logger.info(f"Fetched {len(history_list)} records for user_id={id}")
+
+        if not history_list:
+            logger.warning(f"No history found for user_id={id}")
+
+        response = render(request, 'patientHistory.html', {
+            "data": history_list
+        })
+
+        logger.info(f"RESPONSE ← {request.method} {request.path} | Status: 200")
+
+        return response
+
+    except Exception:
+        logger.exception(f"ERROR fetching patient history | user_id={id}")
+
+        return render(request, 'patientHistory.html', {
+            "data": [],
+            "error": "Unable to load patient history."
+        })
+
 
 def report(request):
-    report_data = (
-        Appoinment.objects.annotate(month=TruncMonth('date'))
-        .values('month','doctor__name','doctor__department')
-        .annotate(total=Count('id'))
-        .order_by('-total')
-    )
-    return render(request,'report.html',{"report_data":report_data})
+    logger.info(f"REQUEST → {request.method} {request.path}")
+
+    start_time = time.time()
+
+    try:
+        queryset = (
+            Appoinment.objects
+            .annotate(month=TruncMonth('date'))
+            .values('month', 'doctor__name', 'doctor__department')
+            .annotate(total=Count('id'))
+            .order_by('-total')
+        )
+
+        
+        report_list = list(queryset)
+
+        query_time = time.time() - start_time
+        logger.info(f"Report query executed in {query_time:.4f}s")
+        logger.info(f"Generated {len(report_list)} report rows")
+
+        if report_list:
+            top = report_list[0]
+            logger.debug(
+                f"Top → Doctor: {top['doctor__name']} | "
+                f"Dept: {top['doctor__department']} | "
+                f"Month: {top['month']} | Total: {top['total']}"
+            )
+        else:
+            logger.warning("Report returned empty dataset")
+
+        response = render(request, "report.html", {
+            "report_data": report_list
+        })
+
+        logger.info(f"RESPONSE ← {request.method} {request.path} | Status: 200")
+        return response
+
+    except Exception:
+        
+        logger.exception("ERROR generating report")
+
+        return render(request, "report.html", {
+            "report_data": [],
+            "error": "Unable to generate report at the moment."
+        })
 
 
 
