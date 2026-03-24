@@ -1249,34 +1249,65 @@ def Logout(request):
 #edit 
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
-def reschedule_appointment(request,pk):
-    appointment=get_object_or_404(Appoinment, pk=pk)
+def reschedule_appointment(request, pk):
+    start_time = time.time()
 
-    #permission check
-    if request.user!=appointment.user and not request.user.is_staff:
-        return Response(
-            {"error":"You do not have permission to reschedule this appointment,"},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
-    serializer=AppointmentReschedulSerializer(
-        appointment,
-        data=request.data,
-        partial=True
-    )
-    
-    if serializer.is_valid():
-        serializer.save()
-        return Response(
-            {
-                "message":"Appointment rescheduled successfully",
-                "appointment":serializer.data
-            },
-            status=status.HTTP_200_OK
-        )
-        
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        appointment = get_object_or_404(Appoinment, pk=pk)
 
+        # Permission check
+        if request.user != appointment.user and not request.user.is_staff:
+            logger.warning(
+                f"Unauthorized reschedule attempt | user_id={request.user.id} | appointment_id={pk} | path={request.path}"
+            )
+            return Response(
+                {"error": "You do not have permission to reschedule this appointment"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = AppointmentReschedulSerializer(
+            appointment,
+            data=request.data,
+            partial=True
+        )
+
+        # Success case
+        if serializer.is_valid():
+            serializer.save()
+
+            duration = round(time.time() - start_time, 3)
+
+            logger.info(
+                f"Appointment rescheduled successfully | user_id={request.user.id} | appointment_id={pk} | updated_fields={list(request.data.keys())} | duration={duration}s"
+            )
+
+            return Response(
+                {
+                    "message": "Appointment rescheduled successfully",
+                    "appointment": serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+
+        # Validation error
+        logger.error(
+            f"Reschedule validation failed | user_id={request.user.id} | appointment_id={pk} | errors={serializer.errors}"
+        )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Unexpected error
+    except Exception as e:
+        duration = round(time.time() - start_time, 3)
+
+        logger.exception(
+            f"Unexpected error in reschedule_appointment | user_id={getattr(request.user, 'id', None)} | appointment_id={pk} | duration={duration}s"
+        )
+
+        return Response(
+            {"error": "Something went wrong"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 

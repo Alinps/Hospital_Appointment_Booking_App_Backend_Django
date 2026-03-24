@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from cloudinary.models import CloudinaryField
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None): 
@@ -25,7 +26,7 @@ class User(AbstractBaseUser):
     gender = models.CharField(max_length=10, choices=[('Male', 'Male'), ('Female', 'Female'), ('Other', 'Other')], null=True, blank=True)
     contact_no = models.CharField(max_length=15, null=True, blank=True)  
     address = models.TextField(null=True, blank=True)
-    avatar = models.ImageField(upload_to="avatar/", null=True, blank=True)
+    avatar = CloudinaryField('image_upload', null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
 
@@ -41,7 +42,7 @@ class Doctor(models.Model):
     department = models.CharField(max_length=100)
     qualification = models.CharField(max_length=255)
     experience = models.IntegerField()
-    image = models.FileField(upload_to='images/',null=True,blank=True)
+    image = CloudinaryField('image_upload', null=True, blank=True)
     
     def str(self):
         return self.name

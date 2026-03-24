@@ -5,7 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('', views.adminlogin,name="adminlogin"),
+    path('', views.adminlogin,name="adminlogin"), # type: ignore
     path('todaysappointment/',views.todaysappointment,name="todaysappointment"),
     path('doctormanagement/',views.doctormanagement,name="doctormanagement"),
     path('doctorview/<int:id>/',views.doctorview,name='doctorview'),
@@ -39,4 +39,4 @@ path('availability/delete/<int:id>/', views.doctor_availability_delete, name='do
     
     
 ]
-urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
+# urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)

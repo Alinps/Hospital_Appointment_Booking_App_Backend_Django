@@ -4,10 +4,24 @@ from adminapp.models import Appoinment
 from django.utils.timezone import now
 from django.contrib.auth import get_user_model
 User = get_user_model()
+
+
 class DoctorSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Doctor
         fields = '__all__'
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+
+        if obj.image:
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+
+        return None
         
 class AppointmentSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
@@ -49,6 +63,7 @@ class AppointmentReschedulSerializer(serializers.ModelSerializer):
     
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="name")
+    avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -62,3 +77,8 @@ class UserSerializer(serializers.ModelSerializer):
             "address",
             "avatar"
         ]
+
+    def get_avatar(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None

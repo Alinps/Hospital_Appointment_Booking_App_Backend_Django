@@ -1,31 +1,22 @@
-Django==6.0
-djangorestframework==3.14.0
-django-cors-headers==4.7.0
+Django>=4.2,<7.0
+djangorestframework
+django-cors-headers
+dj-database-url
+python-dotenv
 
-# Authentication (JWT)
+# Database (PostgreSQL - Neon)
+psycopg2-binary
 
-djangorestframework-simplejwt==5.5.0
+# Auth
+djangorestframework-simplejwt
 
-# Database (MySQL)
+# Media
+cloudinary
+pillow
 
-mysqlclient==2.2.7
+# HTTP / API
+requests
 
-# Image handling
-
-Pillow==11.2.1
-
-# Environment variables
-
-python-dotenv==1.1.1
-
-# HTTP requests (if used)
-
-requests==2.32.3
-
-# PDF generation (choose one approach — keeping reportlab)
-
-reportlab==4.4.1
-
-# SMS / OTP (keep only if used)
-
-twilio==9.7.1
+# Utilities
+reportlab
+twilio
