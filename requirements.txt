@@ -23,3 +23,5 @@ twilio
 
 # Production server
 gunicorn
+
+whitenoise
