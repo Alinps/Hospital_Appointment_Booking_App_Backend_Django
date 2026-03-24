@@ -20,3 +20,6 @@ requests
 # Utilities
 reportlab
 twilio
+
+# Production server
+gunicorn
