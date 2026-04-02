@@ -706,6 +706,30 @@ def report(request):
 
 
 #-------------------------------API----------------------------------------
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def wakeup(request):
+    try:
+
+        logger.info(
+            f"Wakeup ping received"
+        )
+
+        return JsonResponse({
+            "status": "ok",
+            "message": "Server is awake"
+        })
+
+    except Exception as e:
+        logger.exception(
+            f"Wakeup error | error={str(e)}"
+        )
+        return JsonResponse({
+            "status": "error",
+            "message": "Server failed"
+        }, status=500)
+
 #Signup
 @api_view(['POST'])
 @permission_classes((AllowAny,))
