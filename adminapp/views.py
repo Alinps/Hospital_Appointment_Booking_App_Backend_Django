@@ -706,7 +706,6 @@ def report(request):
 
 
 #-------------------------------API----------------------------------------
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def wakeup(request):
@@ -729,7 +728,6 @@ def wakeup(request):
             "status": "error",
             "message": "Server failed"
         }, status=500)
-
 #Signup
 @api_view(['POST'])
 @permission_classes((AllowAny,))

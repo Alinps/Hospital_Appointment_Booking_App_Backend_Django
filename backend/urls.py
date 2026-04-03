@@ -36,7 +36,7 @@ path('availability/delete/<int:id>/', views.doctor_availability_delete, name='do
      path('profile/',views.profile_view,name="profile"),
      path('doctor/<int:doctor_id>/slots/',views.get_available_slots,name="available_slots"),
      path('doctordetail/<int:doctor_id>',views.doctor_detail),
-    path("health_check/",views.wakeup)
+     path("health_check/",views.wakeup)
     
     
 ]
