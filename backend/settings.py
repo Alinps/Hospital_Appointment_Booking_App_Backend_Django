@@ -98,16 +98,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'appointment_db',#Name of the database created for this project
-#         'USER': 'root',#Enter your mysql username
-#         'PASSWORD': 'alinps@7034588406',#Enter your mysql password
-#         'HOST': 'localhost',
-#         'PORT': '3306',
-#     }
-# }
+
 
 DATABASES = {
     'default': dj_database_url.parse(
@@ -175,22 +166,8 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated', )
 }
 
-# CORS_ALLOW_ALL_ORIGINS = True
-
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-# ]
-
-# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-# MEDIA_URL = '/media/'
 
 
-# #pagination
-# REST_FRAMEWORK = {
-#     "DEFAULT_PAGINATION_CLASS": 
-#         "rest_framework.pagination.PageNumberPagination",
-#     "PAGE_SIZE": 5,  # doctors per page
-# }
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
