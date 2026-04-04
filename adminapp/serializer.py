@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from adminapp.models import Doctor
-from adminapp.models import Appoinment
+from adminapp.models import Appointment
 from django.utils.timezone import now
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -28,14 +28,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
     department = serializers.CharField(source='doctor.department', read_only=True)
 
     class Meta:
-        model = Appoinment
+        model = Appointment
         fields = ['id', 'doctor', 'doctor_name', 'department', 'user', 'date','time']  # Include relevant fields
 
 
 
 class AppointmentReschedulSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Appoinment
+        model=Appointment
         fields=("date","time")
     def validate(self,data):
         appointment=self.instance
@@ -47,7 +47,7 @@ class AppointmentReschedulSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Cannot reschedule to a past date.")
         
         #Conflict check
-        conflict = Appoinment.objects.filter(
+        conflict = Appointment.objects.filter(
             doctor=appointment.doctor, # type: ignore
             date=new_date,
             time=new_time

@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
-from .models import User,Doctor,Appoinment,DoctorAvailability
+from .models import User,Doctor,Appointment,DoctorAvailability
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from .serializer import DoctorSerializer,AppointmentSerializer,AppointmentReschedulSerializer,UserSerializer
@@ -115,17 +115,17 @@ def todaysappointment(request):
     try:
         # Filter appointments
         if selected_date:
-            appointments = Appoinment.objects.filter(date=selected_date)
+            appointments = Appointment.objects.filter(date=selected_date)
         else:
             today = date.today()
-            appointments = Appoinment.objects.filter(date=today)
+            appointments = Appointment.objects.filter(date=today)
 
         #  Past & upcoming
-        past_appointments = Appoinment.objects.filter(
+        past_appointments = Appointment.objects.filter(
             date__lt=now.date()
         ).order_by('-date')
 
-        upcoming_appointments = Appoinment.objects.filter(
+        upcoming_appointments = Appointment.objects.filter(
             date__gte=now.date()
         ).order_by('date')
 
@@ -600,7 +600,7 @@ def doctor_availability_delete(request, id):
 def history(request):
     logger.info(f"REQUEST → {request.method} {request.path}")
 
-    data = Appoinment.objects.all()
+    data = Appointment.objects.all()
     count = data.count()
 
     logger.info(f"Fetched {count} appointments from database")
@@ -622,7 +622,7 @@ def patientHistory(request, id):
 
     try:
         queryset = (
-            Appoinment.objects
+            Appointment.objects
             .filter(user__id=id)
             .order_by('-date')
         )
@@ -662,7 +662,7 @@ def report(request):
 
     try:
         queryset = (
-            Appoinment.objects
+            Appointment.objects
             .annotate(month=TruncMonth('date'))
             .values('month', 'doctor__name', 'doctor__department')
             .annotate(total=Count('id'))
@@ -1003,7 +1003,7 @@ def get_available_slots(request, doctor_id):
             current += timedelta(minutes=30)
 
         #get booked slots
-        booked = Appoinment.objects.filter(
+        booked = Appointment.objects.filter(
             doctor=doctor,
             date=appointment_date
         ).values_list('time', flat=True)
@@ -1070,7 +1070,7 @@ def appointmentbooking(request):
         appointment_time = datetime.strptime(time_str, "%H:%M").time()
 
         #Check slot already booked
-        if Appoinment.objects.filter(
+        if Appointment.objects.filter(
             doctor=doctor,
             date=appointment_date,
             time=appointment_time
@@ -1082,7 +1082,7 @@ def appointmentbooking(request):
             return Response({'error': 'Slot already booked'}, status=400)
 
         # Create appointment
-        appointment = Appoinment.objects.create(
+        appointment = Appointment.objects.create(
             doctor=doctor,
             user=user,
             date=appointment_date,
@@ -1179,7 +1179,7 @@ def myappointments(request):
     logger.info(f"My appointments request received | user_id={user.id}")
 
     try:
-        appointments = Appoinment.objects.filter(user=user).order_by("-date", "-time")
+        appointments = Appointment.objects.filter(user=user).order_by("-date", "-time")
 
         serializer = AppointmentSerializer(appointments, many=True)
 
@@ -1214,8 +1214,8 @@ def cancelappointment(request,id):
     user = request.user
     
     try:
-        appointment = Appoinment.objects.get(id=id, user=user)
-    except Appoinment.DoesNotExist:
+        appointment = Appointment.objects.get(id=id, user=user)
+    except Appointment.DoesNotExist:
         return Response({"message":'Appointment not found'}, status =404)
     appointment.delete()
     return Response({'message':'Appointment cancelled successfully'},status=200)
@@ -1275,7 +1275,7 @@ def reschedule_appointment(request, pk):
     start_time = time.time()
 
     try:
-        appointment = get_object_or_404(Appoinment, pk=pk)
+        appointment = get_object_or_404(Appointment, pk=pk)
 
         # Permission check
         if request.user != appointment.user and not request.user.is_staff:
