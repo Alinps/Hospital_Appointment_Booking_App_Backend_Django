@@ -133,27 +133,28 @@ Create a `.env` file in project root and define:
 - `CLOUDINARY_API_SECRET`
 
 ## Local Setup
-
-1. Create and activate a virtual environment.
-2. Install dependencies:
+1. Clone this repository to your local machine to get started quickly.
+2. Create and activate a virtual environment.
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. Set up `.env` with required values.
-4. Run migrations:
+4. Set up `.env` with required values.
+5. Run migrations:
    ```bash
    python manage.py makemigrations
    python manage.py migrate
    ```
-5. Create a super/admin user (if needed):
+6. Create a super/admin user (if needed):
    ```bash
    python manage.py createsuperuser
    ```
-6. Start development server:
+7. Start development server:
    ```bash
    python manage.py runserver
    ```
-
+8. To run the frontend, please navigate to the frontend repository on my GitHub and clone it to your local machine.
+   [Frontend Repository](https://github.com/Alinps/Hospital_Appointment_Booking_App_Frontend-React.js-.git)
 ## Deployment Notes
 - `procfile` runs Gunicorn:
   - `web: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3`
